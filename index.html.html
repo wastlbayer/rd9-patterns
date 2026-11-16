@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <title>RD9 Pattern Manager</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23ef4444'/%3E%3Ctext x='32' y='43' font-family='Arial,sans-serif' font-size='32' font-weight='bold' text-anchor='middle' fill='%230a0a0a'%3ER%3C/text%3E%3C/svg%3E" />
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23ef4444'/%3E%3Ctext x='32' y='43' font-family='Arial,sans-serif' font-size='32' font-weight='bold' text-anchor='middle' fill='%230a0a0a'%3ER%3C/text%3E%3C/svg%3E" />
+    <script>
+      var manifest = {
+        name: "RD9 Pattern Manager",
+        short_name: "RD9",
+        description: "Drum-Patterns und Songs für die Behringer RD9 komponieren, speichern und offline abspielen",
+        start_url: ".",
+        scope: ".",
+        display: "standalone",
+        orientation: "any",
+        background_color: "#0a0a0a",
+        theme_color: "#0a0a0a",
+        icons: [
+          {
+            src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23ef4444'/%3E%3Ctext x='32' y='43' font-family='Arial,sans-serif' font-size='32' font-weight='bold' text-anchor='middle' fill='%230a0a0a'%3ER%3C/text%3E%3C/svg%3E",
+            sizes: "any", type: "image/svg+xml", purpose: "any"
+          }
+        ]
+      };
+      var manifestLink = document.createElement("link");
+      manifestLink.rel = "manifest";
+      manifestLink.href = "data:application/manifest+json," + encodeURIComponent(JSON.stringify(manifest));
+      document.head.appendChild(manifestLink);
+      if ("serviceWorker" in navigator && location.protocol === "https:") {
+        navigator.serviceWorker.register("sw.js").catch(function(){});
+      }
+    </script>
+    <style>
+      :root { font-family: system-ui, -apple-system, sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #0a0a0a; color: #f5f5f5; padding: 16px; }
+      .wrap { max-width: 920px; margin: 0 auto; }
+      header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+      .logo { width: 40px; height: 40px; border-radius: 50%; background: #ef4444; color: #0a0a0a; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+      h1 { font-size: 20px; margin: 0; }
+      .sub { font-size: 12px; color: #a3a3a3; margin: 2px 0 0; }
+      .panel { background: #171717; border: 1px solid #262626; border-radius: 12px; padding: 16px; margin-bottom: 18px; }
+      .transport { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+      button { cursor: pointer; border: none; border-radius: 8px; font-size: 14px; padding: 9px 14px; background: #262626; color: #f5f5f5; transition: background .15s; font-family: inherit; }
+      button:hover { background: #333; }
+      button:disabled { opacity: .4; cursor: default; }
+      .play { background: #059669; font-weight: 600; min-width: 96px; }
+      .play.on { background: #ef4444; color: #0a0a0a; }
+      .songplay { background: #7c3aed; font-weight: 600; }
+      .songplay.on { background: #ef4444; color: #0a0a0a; }
+      .save { background: #ef4444; color: #0a0a0a; font-weight: 600; }
+      .row { display: flex; align-items: center; gap: 8px; }
+      input[type=range] { accent-color: #ef4444; width: 120px; }
+      .bpm { font-family: monospace; width: 34px; text-align: right; font-size: 14px; }
+      .gridscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .grid { min-width: 620px; }
+      .stepnums { display: flex; gap: 4px; margin-bottom: 4px; padding-left: 122px; }
+      .stepnums div { width: 33px; text-align: center; font-size: 10px; font-family: monospace; color: #666; }
+      .stepnums div.beat { color: #d4d4d4; }
+      .stepnums div.cur { color: #ef4444; font-weight: 700; }
+      .rowline { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
+      .lbl { width: 118px; flex-shrink: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #e5e5e5; }
+      .cell { width: 33px; height: 32px; border-radius: 6px; border: 1px solid #333; background: #1f1f1f; padding: 0; transition: transform .05s; flex-shrink: 0; }
+      .cell.beat { background: #2f2f2f; border-color: #444; }
+      .cell:active { transform: scale(.9); }
+      .cell.s1 { background: repeating-linear-gradient(45deg, #ef4444 0 3px, #262626 3px 7px); border-color: #ef4444; }
+      .cell.s2 { background: #ef4444; border-color: #ef4444; box-shadow: 0 0 8px #ef444455; }
+      .cell.cur { outline: 2px solid #fb923c; outline-offset: -1px; }
+      .hint { font-size: 11px; color: #737373; margin: 12px 0 0; }
+      .saverow { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+      .saverow input[type=text] { flex: 1; min-width: 160px; background: #262626; border: 1px solid #404040; color: #f5f5f5; border-radius: 8px; padding: 9px 12px; font-size: 14px; font-family: inherit; }
+      .saverow input[type=text]:focus { outline: none; border-color: #ef4444; }
+      h2 { font-size: 14px; margin: 0 0 8px; color: #d4d4d4; }
+      .plist { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; }
+      .pitem { display: flex; align-items: center; gap: 6px; background: #1f1f1f; border: 1px solid #333; border-radius: 10px; padding: 8px 12px; }
+      .pname { flex: 1; min-width: 0; }
+      .pname .n { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .pname .m { font-size: 11px; color: #737373; }
+      .pitem button { padding: 6px 10px; font-size: 12px; }
+      .b-load { background: #0369a1; }
+      .b-copy { background: #3f3f3f; }
+      .b-song { background: #6d28d9; }
+      .b-del { background: #7f1d1d; }
+      .btn-sq { padding: 6px 9px; font-size: 12px; min-width: 30px; }
+      .empty { font-size: 12px; color: #737373; }
+      /* Song-Kette */
+      .chain { display: flex; gap: 10px; overflow-x: auto; padding: 6px 2px 10px; min-height: 96px; }
+      .chain .placeholder { color: #737373; font-size: 12px; display: flex; align-items: center; }
+      .chainitem { flex-shrink: 0; width: 132px; background: #1f1f1f; border: 1px solid #444; border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+      .chainitem.active { border-color: #ef4444; box-shadow: 0 0 10px #ef444444; }
+      .chainitem .cn { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .chainitem .crep { display: flex; align-items: center; justify-content: center; gap: 6px; }
+      .chainitem .rep { font-size: 14px; font-weight: 700; color: #ef4444; min-width: 26px; text-align: center; }
+      .chainitem .crow { display: flex; justify-content: center; gap: 4px; }
+      .chainitem button { padding: 3px 8px; font-size: 11px; border-radius: 6px; }
+      .b-mv { background: #3f3f3f; }
+      .b-rm { background: #7f1d1d; }
+      .songpos { font-size: 13px; color: #fb923c; margin-left: 8px; }
+      .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #f5f5f5; color: #0a0a0a; padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 500; box-shadow: 0 4px 20px rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 99; }
+      .toast.show { opacity: 1; }
+      @media (max-width: 700px) { .cell { width: 24px; height: 28px; } .stepnums div { width: 24px; } .lbl { width: 92px; font-size: 10px; } .stepnums { padding-left: 96px; } }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <header>
+        <div class="logo">R</div>
+        <div>
+          <h1>RD9 Pattern Manager</h1>
+          <p class="sub">Patterns &amp; ganze Songs komponieren, speichern &amp; abspielen</p>
+        </div>
+      </header>
+
+      <div class="panel transport">
+        <button id="playBtn" class="play">▶ Play</button>
+        <div class="row">
+          <span style="font-size:13px;color:#a3a3a3">BPM</span>
+          <input type="range" id="bpm" min="40" max="250" value="120" />
+          <span class="bpm" id="bpmVal">120</span>
+        </div>
+        <button id="clearBtn">Grid leeren</button>
+        <button id="exportBtn">⬇ Export</button>
+        <label><button id="importBtn" onclick="document.getElementById('importFile').click()">⬆ Import</button><input type="file" id="importFile" accept=".json" hidden /></label>
+        <button id="installBtn" class="save" hidden>📲 App installieren</button>
+        <span class="songpos" id="songpos"></span>
+      </div>
+
+      <div class="panel gridscroll">
+        <div class="grid">
+          <div class="stepnums" id="stepnums"></div>
+          <div id="grid"></div>
+        </div>
+        <p class="hint">1× klicken: schraffiert (normal) · 2× klicken: ausgefüllt (accent) · 3× klicken: leer. Rechtsklick geht einen Schritt zurück. Beim Setzen hörst du den Sound als Vorschau.</p>
+      </div>
+
+      <div class="panel">
+        <div class="saverow">
+          <input type="text" id="pname" placeholder="Pattern-Name…" />
+          <button id="saveBtn" class="save">💾 Speichern</button>
+        </div>
+        <h2 id="plistHead">Gespeicherte Patterns (0)</h2>
+        <div class="plist" id="plist"></div>
+        <p class="hint">„Laden" öffnet das Pattern im Editor oben. Mit „→ Song" hängst du es rechts in die Song-Kette an.</p>
+      </div>
+
+      <div class="panel">
+        <h2>🎵 Song-Kette <span id="songbarinfo" style="color:#737373;font-weight:400"></span></h2>
+        <div class="chain" id="chain"></div>
+        <div class="saverow" style="margin-top:8px;margin-bottom:0">
+          <button id="songPlayBtn" class="songplay">▶ Song abspielen</button>
+          <input type="text" id="songname" placeholder="Song-Name…" />
+          <button id="songSaveBtn" class="save">💾 Song speichern</button>
+        </div>
+        <h2 id="songsHead" style="margin-top:14px">Gespeicherte Songs (0)</h2>
+        <div class="plist" id="songslist"></div>
+        <p class="hint">Die Kette läuft von links nach rechts: Jeder Baustein ist ein Pattern mit einstellbarer Wiederholung (×). „▶ Song abspielen" spielt die ganze Kette am Stück.</p>
+      </div>
+    </main>
+    <div class="toast" id="toast"></div>
+
+    <script>
+      var INSTRUMENTS = [
+        { id:"BD", name:"Bass Drum" },
+        { id:"SD", name:"Snare Drum" },
+        { id:"LT", name:"Low Tom / Conga" },
+        { id:"MT", name:"Mid Tom / Conga" },
+        { id:"HT", name:"Hi Tom / Conga" },
+        { id:"RS", name:"Rimshot" },
+        { id:"CB", name:"Cowbell" },
+        { id:"CL", name:"Clave" },
+        { id:"CP", name:"Clap" },
+        { id:"MA", name:"Maracas" },
+        { id:"CY", name:"Cymbal" },
+        { id:"OH", name:"Open Hat" },
+        { id:"CH", name:"Closed Hat" }
+      ];
+      var STEPS = 16, KEY_P = "rd9-patterns-v2", KEY_S = "rd9-songs-v1";
+      var grid = emptyGrid(), patterns = loadPatterns(), songs = loadSongs();
+      var chain = [];   // [{name, repeats}]
+      var mode = "pattern", playing = false, step = -1, barIndex = 0, barInSong = 0, timer = null, ctx = null;
+      var songSeq = []; // expanded: [{name, grid}]
+      var cellRefs = [], numRefs = [];
+
+      // 0 = leer, 1 = schraffiert (normal), 2 = ausgefüllt (accent)
+      function emptyGrid() {
+        var g = {};
+        INSTRUMENTS.forEach(function(i){ var a = []; for (var s=0;s<STEPS;s++) a.push(0); g[i.id] = a; });
+        return g;
+      }
+      function migrateGrid(p) {
+        var g = emptyGrid();
+        INSTRUMENTS.forEach(function(inst) {
+          var src = p[inst.id] || [];
+          for (var s=0;s<STEPS;s++) {
+            var v = src[s];
+            if (v === true) g[inst.id][s] = 1;
+            else if (v === 2 || v === 1) g[inst.id][s] = v;
+          }
+        });
+        if (p["AC"]) for (var s2=0;s2<STEPS;s2++) { if (p["AC"][s2]===true) { INSTRUMENTS.forEach(function(inst){ if (g[inst.id][s2]===1) g[inst.id][s2]=2; }); } }
+        return g;
+      }
+      function loadPatterns() {
+        var out = {};
+        var add = function(raw) {
+          Object.keys(raw).forEach(function(name) {
+            var p = raw[name];
+            if (p && p.grid) out[name] = { grid: migrateGrid(p.grid), bpm: p.bpm || 120, saved: p.saved || "" };
+          });
+        };
+        try { var r = localStorage.getItem(KEY_P); if (r) add(JSON.parse(r)); } catch(e) {}
+        try { var old = localStorage.getItem("rd9-pattern-manager-v1"); if (old) add(JSON.parse(old)); } catch(e) {}
+        return out;
+      }
+      function loadSongs() {
+        try { var r = localStorage.getItem(KEY_S); if (r) return JSON.parse(r); } catch(e) {}
+        return {};
+      }
+      function persistP() { try { localStorage.setItem(KEY_P, JSON.stringify(patterns)); } catch(e) {} }
+      function persistS() { try { localStorage.setItem(KEY_S, JSON.stringify(songs)); } catch(e) {} }
+      function toast(msg) {
+        var t = document.getElementById("toast");
+        t.textContent = msg; t.classList.add("show");
+        clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove("show"); }, 1800);
+      }
+      function deepGrid(g) { return JSON.parse(JSON.stringify(g)); }
+
+      // ---------- Audio ----------
+      function getCtx() {
+        if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === "suspended") ctx.resume();
+        return ctx;
+      }
+      function noise(c, dur, type, freq, vol, t) {
+        var len = Math.max(1, Math.floor(c.sampleRate * dur));
+        var buf = c.createBuffer(1, len, c.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var i=0;i<len;i++) d[i] = Math.random()*2-1;
+        var src = c.createBufferSource(); src.buffer = buf;
+        var f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+        var gn = c.createGain();
+        gn.gain.setValueAtTime(vol, t);
+        gn.gain.exponentialRampToValueAtTime(0.001, t+dur);
+        src.connect(f); f.connect(gn); gn.connect(c.destination);
+        src.start(t);
+      }
+      function tone(c, freq, dur, type, vol, t, slide) {
+        var o = c.createOscillator(); o.type = type;
+        o.frequency.setValueAtTime(freq, t);
+        if (slide) o.frequency.exponentialRampToValueAtTime(slide, t+dur);
+        var gn = c.createGain();
+        gn.gain.setValueAtTime(vol, t);
+        gn.gain.exponentialRampToValueAtTime(0.001, t+dur);
+        o.connect(gn); gn.connect(c.destination);
+        o.start(t); o.stop(t+dur);
+      }
+      function play(inst, accent) {
+        var c = getCtx(), t = c.currentTime;
+        var g = accent ? 0.95 : 0.55;
+        function N(dur, ft, fr, v) { noise(c, dur, ft, fr, v*g); }
+        function T(fr, dur, ty, v, sl) { tone(c, fr, dur, ty, v*g, t, sl); }
+        switch (inst) {
+          case "BD": T(120, 0.4, "sine", 1.0, 40); break;
+          case "SD": T(190, 0.12, "triangle", 0.5, 120); N(0.2, "highpass", 1200, 0.5); break;
+          case "LT": T(110, 0.3, "sine", 0.7, 80); break;
+          case "MT": T(160, 0.25, "sine", 0.7, 120); break;
+          case "HT": T(220, 0.2, "sine", 0.7, 170); break;
+          case "RS": T(320, 0.05, "square", 0.4, 300); break;
+          case "CB": T(540, 0.15, "square", 0.35); T(800, 0.15, "square", 0.3); break;
+          case "CL": T(1700, 0.06, "square", 0.35); break;
+          case "CP": N(0.15, "bandpass", 1400, 0.8); N(0.1, "bandpass", 1800, 0.5); break;
+          case "MA": N(0.05, "highpass", 6000, 0.5); break;
+          case "CY": N(0.9, "highpass", 7000, 0.4); break;
+          case "OH": N(0.4, "highpass", 8000, 0.45); break;
+          case "CH": N(0.06, "highpass", 9000, 0.45); break;
+        }
+      }
+
+      // ---------- Editor-Grid ----------
+      function buildGrid() {
+        var nums = document.getElementById("stepnums");
+        nums.innerHTML = ""; numRefs = [];
+        for (var s=0;s<STEPS;s++) {
+          var d = document.createElement("div");
+          d.className = (s%4===0 ? "beat" : "");
+          d.textContent = s+1;
+          nums.appendChild(d); numRefs.push(d);
+        }
+        var host = document.getElementById("grid");
+        host.innerHTML = ""; cellRefs = [];
+        INSTRUMENTS.forEach(function(inst, r) {
+          var row = document.createElement("div");
+          row.className = "rowline";
+          var lbl = document.createElement("div");
+          lbl.className = "lbl";
+          lbl.textContent = inst.name;
+          row.appendChild(lbl);
+          cellRefs.push([]);
+          for (var s=0;s<STEPS;s++) {
+            (function(id, r, s){
+              var b = document.createElement("button");
+              b.className = "cell" + (s%4===0 ? " beat" : "");
+              b.setAttribute("aria-label", inst.name + " Step " + (s+1));
+              b.addEventListener("click", function() {
+                if (playing && mode === "song") { toast("Stoppe den Song, um zu bearbeiten."); return; }
+                var v = grid[id][s];
+                v = (v + 1) % 3;
+                grid[id][s] = v;
+                if (v > 0) play(id, v === 2);
+                paint();
+              });
+              b.addEventListener("contextmenu", function(e) {
+                e.preventDefault();
+                if (playing && mode === "song") return;
+                var v = grid[id][s];
+                v = (v + 2) % 3;
+                grid[id][s] = v;
+                paint();
+              });
+              row.appendChild(b);
+              cellRefs[r].push(b);
+            })(inst.id, r, s);
+          }
+          host.appendChild(row);
+        });
+        paint();
+      }
+      function paint() {
+        INSTRUMENTS.forEach(function(inst, r) {
+          for (var s=0;s<STEPS;s++) {
+            var b = cellRefs[r][s], v = grid[inst.id][s];
+            b.classList.toggle("s1", v === 1);
+            b.classList.toggle("s2", v === 2);
+            b.classList.toggle("cur", s === step);
+          }
+        });
+        for (var s2=0;s2<STEPS;s2++) {
+          numRefs[s2].classList.toggle("cur", s2 === step);
+        }
+      }
+
+      // ---------- Playback ----------
+      function buildSongSeq() {
+        songSeq = []; barInSong = 0; barIndex = 0;
+        chain.forEach(function(e) {
+          var p = patterns[e.name];
+          for (var r=0;r<e.repeats;r++) songSeq.push({ name: e.name, grid: p ? p.grid : null });
+        });
+      }
+      function tick() {
+        var g, accent;
+        if (mode === "song") {
+          var entry = songSeq[barIndex] || { grid: null };
+          g = entry.grid;
+          if (!g) { advance(); return; }
+        } else g = grid;
+        INSTRUMENTS.forEach(function(inst) {
+          var v = g[inst.id][step];
+          if (v > 0) play(inst.id, v === 2);
+        });
+        advance();
+      }
+      function advance() {
+        var last = step === STEPS - 1;
+        step = (step + 1) % STEPS;
+        if (mode === "song") {
+          if (last) { barIndex = (barIndex + 1) % songSeq.length; barInSong = barIndex; renderChain(); }
+          document.getElementById("songbarinfo").textContent = "– Takt " + (barInSong+1) + "/" + songSeq.length + ": " + (songSeq[barInSong] ? songSeq[barInSong].name : "–");
+          document.getElementById("songpos").textContent = "♪ " + (songSeq[barInSong] ? songSeq[barInSong].name : "");
+        }
+        paint();
+      }
+      function schedule() {
+        var bpm = +document.getElementById("bpm").value;
+        timer = setTimeout(function(){ tick(); schedule(); }, (60/bpm/4)*1000);
+      }
+      function stopAll() {
+        playing = false; clearTimeout(timer); step = -1; barIndex = 0;
+        document.getElementById("playBtn").textContent = "▶ Play";
+        document.getElementById("playBtn").classList.remove("on");
+        document.getElementById("songPlayBtn").textContent = "▶ Song abspielen";
+        document.getElementById("songPlayBtn").classList.remove("on");
+        document.getElementById("songbarinfo").textContent = "";
+        document.getElementById("songpos").textContent = "";
+        paint(); renderChain();
+      }
+      function startPattern() {
+        mode = "pattern"; playing = true; step = 0;
+        document.getElementById("playBtn").textContent = "❚❚ Stop";
+        document.getElementById("playBtn").classList.add("on");
+        tick(); schedule();
+      }
+      function startSong() {
+        if (!chain.length) { toast("Song-Kette ist leer – füge zuerst Patterns hinzu."); return; }
+        buildSongSeq();
+        mode = "song"; playing = true; step = 0; barIndex = 0; barInSong = 0;
+        document.getElementById("songPlayBtn").textContent = "❚❚ Stop";
+        document.getElementById("songPlayBtn").classList.add("on");
+        renderChain();
+        tick(); schedule();
+      }
+
+      // ---------- Pattern-Liste ----------
+      function renderList() {
+        var names = Object.keys(patterns);
+        document.getElementById("plistHead").textContent = "Gespeicherte Patterns (" + names.length + ")";
+        var host = document.getElementById("plist");
+        host.innerHTML = "";
+        if (!names.length) {
+          host.innerHTML = '<p class="empty">Noch keine Patterns gespeichert. Oben im Editor einen Namen eingeben und auf „Speichern" klicken.</p>';
+          return;
+        }
+        names.forEach(function(name) {
+          var p = patterns[name];
+          var item = document.createElement("div");
+          item.className = "pitem";
+          var meta = (p.bpm ? p.bpm + " BPM" : "");
+          if (p.saved) meta += (meta ? " · " : "") + new Date(p.saved).toLocaleString("de-DE");
+          item.innerHTML = '<div class="pname"><div class="n"></div><div class="m">' + meta + '</div></div>';
+          item.querySelector(".n").textContent = name;
+          function btn(txt, cls, title, fn) {
+            var b = document.createElement("button");
+            b.textContent = txt; b.className = cls; b.title = title;
+            b.addEventListener("click", fn);
+            item.appendChild(b);
+          }
+          btn("Kopieren", "b-copy", "Zum Bearbeiten in den Editor kopieren", function(){
+            grid = deepGrid(p.grid); buildGrid();
+            toast("„" + name + '" in den Editor kopiert');
+          });
+          btn("Laden", "b-load", "Laden", function(){
+            grid = deepGrid(p.grid);
+            document.getElementById("bpm").value = p.bpm || 120;
+            document.getElementById("bpmVal").textContent = p.bpm || 120;
+            document.getElementById("pname").value = name;
+            buildGrid(); toast("„" + name + '" geladen');
+          });
+          btn("→ Song", "b-song", "An die Song-Kette anhängen", function(){
+            chain.push({ name: name, repeats: 1 });
+            renderChain(); toast("„" + name + '" zur Song-Kette hinzugefügt');
+          });
+          btn("🗑", "b-del", "Löschen", function(){
+            if (!confirm("„" + name + '" löschen?')) return;
+            delete patterns[name]; persistP();
+            chain = chain.filter(function(e){ return e.name !== name; });
+            renderList(); renderChain();
+            toast("„" + name + '" gelöscht');
+          });
+          host.appendChild(item);
+        });
+      }
+
+      // ---------- Song-Kette ----------
+      function renderChain() {
+        var host = document.getElementById("chain");
+        host.innerHTML = "";
+        if (!chain.length) {
+          var ph = document.createElement("div");
+          ph.className = "placeholder";
+          ph.textContent = 'Leer – klicke bei einem gespeicherten Pattern auf „→ Song“, dann erscheint es hier.';
+          host.appendChild(ph);
+          return;
+        }
+        chain.forEach(function(e, idx) {
+          var item = document.createElement("div");
+          item.className = "chainitem" + (playing && mode === "song" && barIndex === idx ? " active" : "");
+          var nm = document.createElement("div");
+          nm.className = "cn"; nm.textContent = (idx+1) + ". " + e.name;
+          item.appendChild(nm);
+          var rep = document.createElement("div");
+          rep.className = "crep";
+          function rb(txt, fn, dis) {
+            var b = document.createElement("button");
+            b.textContent = txt; b.className = "btn-sq"; b.onclick = fn; if (dis) b.disabled = true;
+            rep.appendChild(b);
+          }
+          rb("–", function(){ if (e.repeats > 1) { e.repeats--; renderChain(); } }, e.repeats <= 1);
+          var rs = document.createElement("span");
+          rs.className = "rep"; rs.textContent = "×" + e.repeats;
+          rep.appendChild(rs);
+          rb("+", function(){ if (e.repeats < 99) { e.repeats++; renderChain(); } });
+          item.appendChild(rep);
+          var mv = document.createElement("div");
+          mv.className = "crow";
+          function mb(txt, cls, fn, dis) {
+            var b = document.createElement("button");
+            b.textContent = txt; b.className = cls; b.onclick = fn; if (dis) b.disabled = true;
+            mv.appendChild(b);
+          }
+          mb("◀", "b-mv", function(){ if (idx > 0) { chain.splice(idx-1, 0, chain.splice(idx,1)[0]); renderChain(); } }, idx === 0);
+          mb("▶", "b-mv", function(){ if (idx < chain.length-1) { chain.splice(idx+1, 0, chain.splice(idx,1)[0]); renderChain(); } }, idx === chain.length-1);
+          mb("✕", "b-rm", function(){ chain.splice(idx,1); renderChain(); });
+          item.appendChild(mv);
+          host.appendChild(item);
+        });
+      }
+
+      // ---------- Songs speichern ----------
+      function renderSongs() {
+        var names = Object.keys(songs);
+        document.getElementById("songsHead").textContent = "Gespeicherte Songs (" + names.length + ")";
+        var host = document.getElementById("songslist");
+        host.innerHTML = "";
+        if (!names.length) {
+          host.innerHTML = '<p class="empty">Noch keine Songs gespeichert. Kette aufbauen, Namen eingeben, „Song speichern" klicken.</p>';
+          return;
+        }
+        names.forEach(function(name) {
+          var s = songs[name];
+          var item = document.createElement("div");
+          item.className = "pitem";
+          var bars = s.chain.reduce(function(a, e){ return a + e.repeats; }, 0);
+          item.innerHTML = '<div class="pname"><div class="n"></div><div class="m">' + s.chain.length + ' Patterns · ' + bars + ' Takte</div></div>';
+          item.querySelector(".n").textContent = name;
+          function btn(txt, cls, title, fn) {
+            var b = document.createElement("button");
+            b.textContent = txt; b.className = cls; b.title = title;
+            b.addEventListener("click", fn);
+            item.appendChild(b);
+          }
+          btn("Laden", "b-load", "Song-Kette laden", function(){
+            chain = JSON.parse(JSON.stringify(s.chain));
+            renderChain(); toast("Song „" + name + '" geladen');
+          });
+          btn("🗑", "b-del", "Löschen", function(){
+            if (!confirm("Song „" + name + '" löschen?')) return;
+            delete songs[name]; persistS(); renderSongs();
+            toast("Song gelöscht");
+          });
+          host.appendChild(item);
+        });
+      }
+
+      // ---------- Events ----------
+      document.getElementById("playBtn").addEventListener("click", function(){
+        if (playing) stopAll(); else startPattern();
+      });
+      document.getElementById("songPlayBtn").addEventListener("click", function(){
+        if (playing) stopAll(); else startSong();
+      });
+      document.getElementById("bpm").addEventListener("input", function(e){
+        document.getElementById("bpmVal").textContent = e.target.value;
+      });
+      document.getElementById("clearBtn").addEventListener("click", function(){ grid = emptyGrid(); buildGrid(); });
+      document.getElementById("saveBtn").addEventListener("click", function(){
+        var name = document.getElementById("pname").value.trim() || "Pattern";
+        patterns[name] = { grid: deepGrid(grid), bpm: +document.getElementById("bpm").value, saved: new Date().toISOString() };
+        persistP(); renderList();
+        toast("„" + name + '" gespeichert');
+      });
+      document.getElementById("pname").addEventListener("keydown", function(e){
+        if (e.key === "Enter") document.getElementById("saveBtn").click();
+      });
+      document.getElementById("songSaveBtn").addEventListener("click", function(){
+        if (!chain.length) { toast("Die Song-Kette ist leer."); return; }
+        var name = document.getElementById("songname").value.trim() || "Song";
+        songs[name] = { chain: JSON.parse(JSON.stringify(chain)), saved: new Date().toISOString() };
+        persistS(); renderSongs();
+        toast("Song „" + name + '" gespeichert');
+      });
+      document.getElementById("exportBtn").addEventListener("click", function(){
+        var data = { patterns: patterns, songs: songs };
+        var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url; a.download = "rd9-patterns-songs.json"; a.click();
+        URL.revokeObjectURL(url);
+        toast("Export heruntergeladen");
+      });
+      document.getElementById("importFile").addEventListener("change", function(e){
+        var file = e.target.files[0]; if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(){
+          try {
+            var imported = JSON.parse(reader.result);
+            var ip = imported.patterns || imported; // auch altes Format
+            Object.keys(ip).forEach(function(name){
+              var p = ip[name];
+              patterns[name] = { grid: p.grid ? migrateGrid(p.grid) : emptyGrid(), bpm: p.bpm || 120, saved: p.saved || "" };
+            });
+            if (imported.songs) Object.keys(imported.songs).forEach(function(name){ songs[name] = imported.songs[name]; });
+            persistP(); persistS();
+            renderList(); renderSongs(); renderChain();
+            toast("Import erfolgreich");
+          } catch(err) { toast("Import fehlgeschlagen"); }
+        };
+        reader.readAsText(file);
+        e.target.value = "";
+      });
+
+      // ---------- PWA-Installation ----------
+      var deferredPrompt = null;
+      window.addEventListener("beforeinstallprompt", function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        var btn = document.getElementById("installBtn");
+        if (btn) btn.hidden = false;
+      });
+      document.getElementById("installBtn").addEventListener("click", function() {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function() { deferredPrompt = null; });
+        document.getElementById("installBtn").hidden = true;
+      });
+      window.addEventListener("appinstalled", function() {
+        toast("App installiert! Findest du jetzt auf deinem Homescreen 🎉");
+      });
+
+      // ---------- Init ----------
+      buildGrid(); renderList(); renderChain(); renderSongs();
+      var first = Object.keys(patterns)[0];
+      if (first) {
+        grid = deepGrid(patterns[first].grid);
+        document.getElementById("pname").value = first;
+        if (patterns[first].bpm) {
+          document.getElementById("bpm").value = patterns[first].bpm;
+          document.getElementById("bpmVal").textContent = patterns[first].bpm;
+        }
+        buildGrid();
+      }
+    </script>
+  </body>
+</html>
